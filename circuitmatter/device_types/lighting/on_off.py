@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-from abc import abstractmethod
+import abc
 
 from circuitmatter.clusters.general import on_off
 from circuitmatter.clusters.general.identify import Identify
@@ -44,12 +44,12 @@ class OnOffLight(simple_device.SimpleDevice):
             return
         self._on_off.OnOff = False
 
-    @abstractmethod
+    @abc.abstractmethod
     def on(self):
         """Called when the light is turned on"""
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def off(self):
         """Called when the light is turned off"""
         pass

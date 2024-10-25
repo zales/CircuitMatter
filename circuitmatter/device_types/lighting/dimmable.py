@@ -42,6 +42,6 @@ class DimmableLight(OnOffLight):
         return self._level_control.CurrentLevel / self._level_control.max_level
 
     @brightness.setter
-    @abstractmethod
+    @abc.abstractmethod
     def brightness(self, value):
         raise NotImplementedError()

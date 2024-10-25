@@ -4,10 +4,10 @@
 
 from __future__ import annotations
 
+import abc
 import enum
 import math
 import struct
-from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import (
     AnyStr,
@@ -208,7 +208,7 @@ _NULLABLE = TypeVar("_NULLABLE", Literal[True], Literal[False])
 _OPT = TypeVar("_OPT", Literal[True], Literal[False])
 
 
-class Member(ABC, Generic[_T, _OPT, _NULLABLE]):
+class Member(abc.ABC, Generic[_T, _OPT, _NULLABLE]):
     max_value_length: int = 0
 
     def __init__(
@@ -356,19 +356,19 @@ class Member(ABC, Generic[_T, _OPT, _NULLABLE]):
         """Return the decoded value at ``offset`` in ``buffer``"""
         return self.decode_member(buffer[offset], buffer, offset + 1)[0]
 
-    @abstractmethod
+    @abc.abstractmethod
     def decode_member(self, control_octet: int, buffer: memoryview, offset: int = 0) -> (_T, int):
         """Return the decoded value at ``offset`` in ``buffer``. ``offset`` is after the tag
         (but before any length)"""
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def encode_element_type(self, value: _T) -> int:
         """Return Element Type Field as defined in Appendix A in the spec"""
         ...
 
     @overload
-    @abstractmethod
+    @abc.abstractmethod
     def encode_value_into(
         self: Member[_T, Literal[True], _NULLABLE] | Member[_T, _OPT, Literal[True]],
         value: _T | None,
@@ -376,19 +376,19 @@ class Member(ABC, Generic[_T, _OPT, _NULLABLE]):
         offset: int,
     ) -> int: ...
     @overload
-    @abstractmethod
+    @abc.abstractmethod
     def encode_value_into(
         self: Member[_T, Literal[False], Literal[False]],
         value: _T,
         buffer: bytearray,
         offset: int,
     ) -> int: ...
-    @abstractmethod
+    @abc.abstractmethod
     def encode_value_into(self, value: _T | None, buffer: bytearray, offset: int) -> int:
         """Encode ``value`` into ``buffer`` and return the new offset"""
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def print(self, value: _T) -> str:
         """Return string representation of ``value``"""
         ...
