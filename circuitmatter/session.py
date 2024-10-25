@@ -139,8 +139,11 @@ class StatusReport:
         self.general_code, self.protocol_id, self.protocol_code = struct.unpack_from("<HIH", buffer)
         self.general_code = GeneralCode(self.general_code)
         self.protocol_data = buffer[8:]
-        if self.protocol_id in protocol.ProtocolId:
+        try:
+            # TODO: Once our minimum version is 3.12+ switch to an "in" check.
             self.protocol_id = protocol.ProtocolId(self.protocol_id)
+        except ValueError:
+            pass
 
         if self.protocol_id == protocol.ProtocolId.SECURE_CHANNEL:
             self.protocol_code = SecureChannelProtocolCode(self.protocol_code)
