@@ -36,4 +36,4 @@ pythonpath = [
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-optional-dependencies = {test = {file = ["test-requirements.txt"]}}
+optional-dependencies = {optional = {file = ["optional_requirements.txt"]}}
