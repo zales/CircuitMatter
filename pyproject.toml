@@ -2,33 +2,26 @@
 #
 # SPDX-License-Identifier: MIT
 
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+    "setuptools-scm",
+]
+
 [project]
 name = "circuitmatter"
 version = "0.0.0+auto.0"
 authors = [{name = "Scott Shawcroft", email = "scott@adafruit.com"}]
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
-dynamic = ["version", "description"]
 requires-python = ">=3.11"
 readme = "README.md"
-dependencies = [
-    "cryptography",
-    "ecdsa",
-    "qrcode",
-    "Adafruit-Blinka"
-]
+dynamic = ["dependencies", "optional-dependencies"]
 
 [project.urls]
 Home = "https://github.com/adafruit/circuitmatter"
 "Bug Tracker" = "https://github.com/adafruit/circuitmatter/issues"
-
-[project.optional-dependencies]
-test = [
-    "hypothesis",
-    "pytest",
-    "pytest-cov",
-    "typing_extensions",
-]
 
 [tool.coverage.run]
 branch = true
@@ -40,3 +33,7 @@ source = [
 pythonpath = [
   "."
 ]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies = {test = {file = ["test-requirements.txt"]}}

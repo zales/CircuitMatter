@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-cryptography
-ecdsa
-qrcode
-Adafruit-Blinka
+hypothesis
+pytest
+pytest-cov
+typing_extensions
