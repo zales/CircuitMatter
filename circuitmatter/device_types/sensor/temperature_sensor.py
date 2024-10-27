@@ -1,10 +1,10 @@
+import random
+
 from circuitmatter.clusters.general.identify import Identify
 from circuitmatter.clusters.measurement.temperature_measurement import (
     TemperatureMeasurement,
 )
 from .. import simple_device
-
-import random
 
 
 class TemperatureSensor(simple_device.SimpleDevice):
