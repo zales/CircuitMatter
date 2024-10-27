@@ -1,3 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Scott Shawcroft for Adafruit Industries
+#
+# SPDX-License-Identifier: MIT
+
+"""Temperature sensor device with an random temperature."""
+
 import random
 
 from circuitmatter.clusters.general.identify import Identify
@@ -7,6 +13,7 @@ from circuitmatter.clusters.measurement.temperature_measurement import (
 from .. import simple_device
 
 
+"""Temperature sensor device with an random temperature."""
 class TemperatureSensor(simple_device.SimpleDevice):
     DEVICE_TYPE_ID = 0x0302
     REVISION = 2
