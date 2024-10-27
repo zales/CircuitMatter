@@ -16,7 +16,7 @@ from .. import simple_device
 
 class TemperatureSensor(simple_device.SimpleDevice):
     """Temperature sensor device with an random temperature."""
-    
+
     DEVICE_TYPE_ID = 0x0302
     REVISION = 2
 
