@@ -9,7 +9,7 @@ import random
 
 class TemperatureSensor(simple_device.SimpleDevice):
     DEVICE_TYPE_ID = 0x0302
-    REVISION = 4
+    REVISION = 2
 
     def __init__(self, name):
         super().__init__(name)
