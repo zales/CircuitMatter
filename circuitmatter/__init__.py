@@ -94,6 +94,7 @@ class CircuitMatter:
             vendor_id,
             product_id,
             version=__version__,
+            product_name=product_name,
         )
         self.add_device(self.root_node)
 

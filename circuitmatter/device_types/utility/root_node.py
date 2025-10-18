@@ -430,13 +430,14 @@ class RootNode(simple_device.SimpleDevice):
         product_id,
         version="",
         serial_number="1234",
+        product_name="CircuitMatter",
     ):
         super().__init__("root")
 
         basic_info = BasicInformationCluster()
         basic_info.vendor_id = vendor_id
         basic_info.product_id = product_id
-        basic_info.product_name = "CircuitMatter"
+        basic_info.product_name = product_name
         basic_info.serial_number = serial_number
         basic_info.software_version_string = version
         self.servers.append(basic_info)

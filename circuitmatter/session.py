@@ -263,6 +263,11 @@ class SecureSessionContext(SessionContext):
         return self._next_exchange_id
 
     def decrypt_and_verify(self, message):
+        # Check if encryption keys are initialized
+        if not hasattr(self, 'i2r') or not hasattr(self, 'r2i'):
+            # Session not fully established yet
+            return False
+
         cipher = self.i2r
         if self.session_role_initiator:
             cipher = self.r2i
