@@ -5,6 +5,7 @@
 import binascii
 import enum
 import inspect
+import logging
 import random
 import struct
 import traceback
@@ -13,6 +14,8 @@ from collections.abc import Iterable
 from typing import Union
 
 from . import interaction_model, tlv
+
+logger = logging.getLogger(__name__)
 
 ATTRIBUTES_KEY = "a"
 
@@ -261,6 +264,22 @@ class ListAttribute(Attribute):
         return [self._element_type.decode(memoryview(binascii.a2b_base64(v))) for v in value]
 
     def _encode(self, value) -> bytes:
+        # Convert dict values to proper Structure objects if needed
+        # This handles cases where ACL was stored as dict in JSON
+        if isinstance(value, list) and value:
+            converted_list = []
+            for item in value:
+                if isinstance(item, dict) and inspect.isclass(self._element_type) and issubclass(self._element_type, tlv.Container):
+                    # Convert dict to Structure object
+                    try:
+                        converted_item = self._element_type.from_value(item)
+                        converted_list.append(converted_item)
+                    except Exception as e:
+                        logger.error("Failed to convert dict to %s: %s", self._element_type.__name__, e)
+                        raise
+                else:
+                    converted_list.append(item)
+            value = converted_list
         return self.tlv_type.encode(value)
 
     def element_from_value(self, value):
@@ -395,18 +414,17 @@ class Cluster:
             self.current_fabric_index = session.local_fabric_index
             value = getattr(self, field_name)
             self.current_fabric_index = None
-            print(
-                "reading",
-                f"EP{path.Endpoint}",
+            logger.debug(
+                "Reading attribute: EP%d %s.%s = %r",
+                path.Endpoint,
                 type(self).__name__,
                 field_name,
-                "->",
                 value,
             )
             if subscription is not None:
                 if path.Attribute not in self._subscriptions:
                     self._subscriptions[descriptor.id] = []
-                print("new subscription")
+                logger.debug("New subscription for attribute %s", field_name)
                 self._subscriptions[descriptor.id].append(subscription)
             if value is None and descriptor.optional:
                 continue
@@ -418,12 +436,12 @@ class Cluster:
             attribute_path.Attribute = descriptor.id
             data.Path = attribute_path
             data.Data = descriptor.encode(value)
-            print(f"{path.Endpoint}/{path.Cluster:x}/{descriptor.id:x} -> {data.Data.hex(' ')}")
+            logger.debug("%d/%x/%x -> %s", path.Endpoint, path.Cluster, descriptor.id, data.Data.hex(' '))
             replies.append(data)
             if path.Attribute is not None:
                 break
         if not replies:
-            print(f"\033[91mnot found 0x{path.Attribute:04x}\033[0m")
+            logger.warning("Attribute 0x%04x not found", path.Attribute)
         return replies
 
     def set_attribute(self, context, attribute_data) -> interaction_model.AttributeStatusIB:
@@ -442,7 +460,7 @@ class Cluster:
                     break
             # value =
             value = attribute_data.Data
-            print("writing", self, field_name, "->", value, "?", has_list_index)
+            logger.debug("Writing attribute: %s.%s = %r (has_list_index=%s)", type(self).__name__, field_name, value, has_list_index) #  self, field_name, "->", value, "?", has_list_index)
 
             if has_list_index:
                 if not isinstance(descriptor, ListAttribute):
@@ -478,7 +496,7 @@ class Cluster:
             if descriptor.command_id != path.Command:
                 continue
 
-            print("invoke", type(self).__name__, field_name)
+            logger.debug("Invoking command: %s.%s", type(self).__name__, field_name) #  type(self).__name__, field_name)
             command = getattr(self, field_name)
             if callable(command):
                 if descriptor.request_type is not None:
@@ -487,16 +505,16 @@ class Cluster:
                     except ValueError:
                         return interaction_model.StatusCode.INVALID_COMMAND
                     try:
-                        print(arg)
+                        logger.debug("Command argument: %r", arg)
                         result = command(session, arg)
                     except Exception as e:
-                        traceback.print_exception(e)
+                        logger.error("Command invocation failed: %s", e, exc_info=True)
                         return interaction_model.StatusCode.FAILURE
                 else:
                     try:
                         result = command(session)
                     except Exception as e:
-                        print(e)
+                        logger.error("Command invocation failed: %s", e)
                         return interaction_model.StatusCode.FAILURE
             else:
                 return interaction_model.StatusCode.UNSUPPORTED_COMMAND
@@ -516,5 +534,5 @@ class Cluster:
                 return cdata
             return result
         if not found:
-            print("not found", path.Command)
+            logger.warning("Command 0x%04x not found", path.Command)
         return None
