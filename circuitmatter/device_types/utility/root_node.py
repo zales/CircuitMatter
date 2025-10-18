@@ -376,15 +376,37 @@ class _NodeOperationalCredentialsCluster(NodeOperationalCredentialsCluster):
         args: NodeOperationalCredentialsCluster.RemoveFabric,
     ) -> NodeOperationalCredentialsCluster.NOCResponse:
         index = args.FabricIndex
+        response = NodeOperationalCredentialsCluster.NOCResponse()
+
+        # Validate that the fabric index is valid
+        if index < 0 or index >= len(self.fabrics):
+            response.StatusCode = NodeOperationalCertStatusEnum.INVALID_FABRIC_INDEX
+            return response
+
+        # Check that we have a fabric at this index
+        if index >= len(self.fabrics) or self.fabrics[index] is None:
+            response.StatusCode = NodeOperationalCertStatusEnum.INVALID_FABRIC_INDEX
+            return response
+
         self.commissioned_fabrics -= 1
 
-        self.noc_keys[index] = None
-        self.root_certs[index] = None
-        self.compressed_fabric_ids[index] = None
-        self.fabrics[index] = None
-        self.nocs[index] = None
+        # Set items to None if the list is long enough, otherwise just ensure list length
+        if index < len(self.noc_keys):
+            self.noc_keys[index] = None
+        if index < len(self.root_certs):
+            self.root_certs[index] = None
+        if index < len(self.compressed_fabric_ids):
+            self.compressed_fabric_ids[index] = None
+        if index < len(self.fabrics):
+            self.fabrics[index] = None
+        if index < len(self.nocs):
+            self.nocs[index] = None
 
-        response = NodeOperationalCredentialsCluster.NOCResponse()
+        # Update nonvolatile storage
+        if index < len(self.encoded_noc_keys):
+            self.encoded_noc_keys[index] = None
+            self._nonvolatile["pk"] = [k for k in self.encoded_noc_keys if k is not None]
+
         response.StatusCode = NodeOperationalCertStatusEnum.OK
         return response
 

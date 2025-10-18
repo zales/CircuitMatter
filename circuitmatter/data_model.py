@@ -258,7 +258,19 @@ class ListAttribute(Attribute):
         ]
 
     def from_json(self, value):
-        return [self._element_type.decode(memoryview(binascii.a2b_base64(v))) for v in value]
+        # Decode each element from base64-encoded TLV
+        decoded = []
+        for v in value:
+            decoded_bytes = memoryview(binascii.a2b_base64(v))
+            decoded_value = self._element_type.decode(decoded_bytes)
+
+            # If the element type is a Structure subclass, convert the raw dict to a Structure instance
+            if (inspect.isclass(self._element_type) and
+                issubclass(self._element_type, tlv.Structure)):
+                decoded_value = self._element_type.from_value(decoded_value)
+
+            decoded.append(decoded_value)
+        return decoded
 
     def _encode(self, value) -> bytes:
         return self.tlv_type.encode(value)
