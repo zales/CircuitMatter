@@ -4,11 +4,15 @@
 
 """Pure Python implementation of the Matter IOT protocol."""
 
+from __future__ import annotations
+
 import binascii
 import hashlib
 import json
+import logging
 import pathlib
 import time
+from typing import Any, Optional
 
 from . import case, interaction_model, nonvolatile, session
 from .device_types.utility.root_node import RootNode
@@ -18,18 +22,21 @@ from .subscription import Subscription
 
 __version__ = "0.0.0+auto.0"
 
+# Configure module logger
+logger = logging.getLogger(__name__)
+
 
 class CircuitMatter:
     def __init__(
         self,
-        socketpool=None,
-        mdns_server=None,
-        random_source=None,
-        state_filename="matter-device-state.json",
-        vendor_id=0xFFF4,
-        product_id=0x1234,
-        product_name="CircuitMatter Device",
-    ):
+        socketpool: Optional[Any] = None,
+        mdns_server: Optional[Any] = None,
+        random_source: Optional[Any] = None,
+        state_filename: str = "matter-device-state.json",
+        vendor_id: int = 0xFFF4,
+        product_id: int = 0x1234,
+        product_name: str = "CircuitMatter Device",
+    ) -> None:
         if socketpool is None:
             import socket
 
@@ -75,7 +82,7 @@ class CircuitMatter:
 
         # Bind the socket to the IP and port
         self.socket.bind((UDP_IP, self.UDP_PORT))
-        print(f"Listening on UDP port {self.UDP_PORT}")
+        logger.info("Listening on UDP port %d", self.UDP_PORT)
         self.socket.setblocking(False)
 
         self._endpoints = {}
@@ -97,7 +104,7 @@ class CircuitMatter:
         if self.root_node.fabric_count == 0:
             self.start_commissioning()
 
-    def start_commissioning(self):
+    def start_commissioning(self) -> None:
         discriminator = self.nonvolatile["discriminator"]
         passcode = self.nonvolatile["passcode"]
         txt_records = {
@@ -113,7 +120,7 @@ class CircuitMatter:
         from . import pase
 
         pase.show_qr_code(self.vendor_id, self.product_id, discriminator, passcode)
-        print("Manual code:", self.nonvolatile["manual_code"])
+        logger.info("Manual code: %s", self.nonvolatile["manual_code"])
         instance_name = self.random.urandom(8).hex().upper()
         self.mdns_server.advertise_service(
             "_matterc",
@@ -127,7 +134,7 @@ class CircuitMatter:
             ],
         )
 
-    def add_cluster(self, endpoint, cluster):
+    def add_cluster(self, endpoint: int, cluster: Any) -> None:
         if endpoint not in self._endpoints:
             self._endpoints[endpoint] = {}
             if endpoint > 0:
@@ -135,7 +142,7 @@ class CircuitMatter:
             self._next_endpoint = max(self._next_endpoint, endpoint + 1)
         self._endpoints[endpoint][cluster.CLUSTER_ID] = cluster
 
-    def add_device(self, device):
+    def add_device(self, device: Any) -> None:
         self._endpoints[self._next_endpoint] = {}
         if self._next_endpoint > 0:
             self.root_node.descriptor.PartsList.append(self._next_endpoint)
@@ -153,7 +160,7 @@ class CircuitMatter:
         device.restore(self.nonvolatile["devices"][device.name])
         self._next_endpoint += 1
 
-    def process_packets(self):
+    def process_packets(self) -> None:
         while True:
             try:
                 nbytes, addr = self.socket.recvfrom_into(
@@ -168,7 +175,7 @@ class CircuitMatter:
         # Do any retransmits or subscriptions
         self.manager.send_packets()
 
-    def _build_attribute_error(self, path, status_code):
+    def _build_attribute_error(self, path: Any, status_code: Any) -> Any:
         report = interaction_model.AttributeReportIB()
         astatus = interaction_model.AttributeStatusIB()
         astatus.Path = path
@@ -188,7 +195,7 @@ class CircuitMatter:
             reports.append(report)
         # Only add status if an error occurs
         if not datas:
-            print("Unsupported attribute", cluster, path)
+            logger.warning("Unsupported attribute - cluster=%s, path=%s", cluster, path)
             report = self._build_attribute_error(
                 path, interaction_model.StatusCode.UNSUPPORTED_ATTRIBUTE
             )
@@ -196,7 +203,7 @@ class CircuitMatter:
         return reports
 
     def invoke(self, session, cluster, path, fields, command_ref):
-        print("invoke", path)
+        logger.debug("Invoking command - path=%s", path)
         response = interaction_model.InvokeResponseIB()
         cdata = cluster.invoke(session, path, fields)
         if isinstance(cdata, interaction_model.CommandDataIB):
@@ -209,7 +216,7 @@ class CircuitMatter:
             status = interaction_model.StatusIB()
             if cdata is None:
                 status.Status = interaction_model.StatusCode.UNSUPPORTED_COMMAND
-                print("UNSUPPORTED_COMMAND")
+                logger.warning("Unsupported command - path=%s", path)
             else:
                 status.Status = cdata
             cstatus.Status = status
@@ -235,7 +242,7 @@ class CircuitMatter:
                 clusters = self._endpoints[endpoint].values()
             else:
                 if path.Cluster not in self._endpoints[endpoint]:
-                    print(f"Cluster 0x{path.Cluster:02x} not found on endpoint {endpoint}")
+                    logger.debug("Cluster 0x%02x not found on endpoint %d", path.Cluster, endpoint)
                     continue
                 clusters = [self._endpoints[endpoint][path.Cluster]]
             for cluster in clusters:
@@ -254,7 +261,7 @@ class CircuitMatter:
         session_context = self.manager.get_session(message)
         if message.secure_session:
             if session_context is None:
-                print("Failed to find session. Ignoring.")
+                logger.warning("Failed to find session for message %d. Ignoring.", message.message_counter)
                 return
             secure_session_context = session_context
 
@@ -264,22 +271,22 @@ class CircuitMatter:
             if message.session_id < len(self.manager.secure_session_contexts):
                 secure_session_context = self.manager.secure_session_contexts[message.session_id]
             if secure_session_context is None:
-                print("Failed to find session. Ignoring.")
+                logger.warning("Failed to find secure session context for session %d. Ignoring.", message.session_id)
                 return
             # Decrypt the payload
             if not secure_session_context.decrypt_and_verify(message):
-                print("Failed to decrypt message. Ignoring.")
+                logger.warning("Failed to decrypt message %d. Ignoring.", message.message_counter)
                 return
         message.parse_protocol_header()
         self.manager.mark_duplicate(message)
 
         exchange = self.manager.process_exchange(message)
         if exchange is None:
-            print(f"Dropping message {message.message_counter}")
+            logger.debug("Dropping message %d", message.message_counter)
             return
         else:
-            print(
-                f"Processing message {message.message_counter} for exchange {exchange.exchange_id}"
+            logger.debug(
+                "Processing message %d for exchange %d", message.message_counter, exchange.exchange_id
             )
 
         protocol_id = message.protocol_id
@@ -287,11 +294,11 @@ class CircuitMatter:
 
         if protocol_id == ProtocolId.SECURE_CHANNEL:  # noqa: PLR1702 Too many nested blocks
             if protocol_opcode == SecureProtocolOpcode.MSG_COUNTER_SYNC_REQ:
-                print("Received Message Counter Synchronization Request")
+                logger.debug("Received Message Counter Synchronization Request")
             elif protocol_opcode == SecureProtocolOpcode.MSG_COUNTER_SYNC_RSP:
-                print("Received Message Counter Synchronization Response")
+                logger.debug("Received Message Counter Synchronization Response")
             elif protocol_opcode == SecureProtocolOpcode.PBKDF_PARAM_REQUEST:
-                print("Received PBKDF Parameter Request")
+                logger.debug("Received PBKDF Parameter Request")
                 from . import pase
 
                 # This is Section 4.14.1.2
@@ -324,11 +331,11 @@ class CircuitMatter:
                 exchange.send(response)
 
             elif protocol_opcode == SecureProtocolOpcode.PBKDF_PARAM_RESPONSE:
-                print("Received PBKDF Parameter Response")
+                logger.debug("Received PBKDF Parameter Response")
             elif protocol_opcode == SecureProtocolOpcode.PASE_PAKE1:
                 from . import pase
 
-                print("Received PASE PAKE1")
+                logger.debug("Received PASE PAKE1")
                 pake1 = pase.PAKE1.decode(message.application_payload)
                 pake2 = pase.PAKE2()
                 verifier = binascii.a2b_base64(self.nonvolatile["verifier"])
@@ -340,17 +347,17 @@ class CircuitMatter:
                 exchange.Ke = Ke
                 exchange.send(pake2)
             elif protocol_opcode == SecureProtocolOpcode.PASE_PAKE2:
-                print("Received PASE PAKE2")
+                logger.debug("Received PASE PAKE2")
                 raise NotImplementedError("Implement SPAKE2+ prover")
             elif protocol_opcode == SecureProtocolOpcode.PASE_PAKE3:
                 from . import pase
 
-                print("Received PASE PAKE3")
+                logger.debug("Received PASE PAKE3")
                 pake3 = pase.PAKE3.decode(message.application_payload)
                 if pake3.cA != exchange.cA:
                     del exchange.cA
                     del exchange.Ke
-                    print("cA mismatch")
+                    logger.warning("cA mismatch - authentication failed")
                     error_status = session.StatusReport()
                     error_status.general_code = session.GeneralCode.FAILURE
                     error_status.protocol_id = ProtocolId.SECURE_CHANNEL
@@ -372,17 +379,17 @@ class CircuitMatter:
 
                     # Compute session keys
                     pase.compute_session_keys(exchange.Ke, secure_session_context)
-                    print("PASE succeeded")
+                    logger.info("PASE authentication succeeded")
             elif protocol_opcode == SecureProtocolOpcode.CASE_SIGMA1:
-                print("Received CASE Sigma1")
+                logger.debug("Received CASE Sigma1")
                 sigma1 = case.Sigma1.decode(message.application_payload)
                 response = self.manager.reply_to_sigma1(exchange, sigma1)
 
                 exchange.send(response)
             elif protocol_opcode == SecureProtocolOpcode.CASE_SIGMA2:
-                print("Received CASE Sigma2")
+                logger.debug("Received CASE Sigma2")
             elif protocol_opcode == SecureProtocolOpcode.CASE_SIGMA3:
-                print("Received CASE Sigma3")
+                logger.debug("Received CASE Sigma3")
                 sigma3 = case.Sigma3.decode(message.application_payload)
                 protocol_code = self.manager.reply_to_sigma3(exchange, sigma3)
 
@@ -395,23 +402,23 @@ class CircuitMatter:
                 error_status.protocol_code = protocol_code
                 exchange.send(error_status)
             elif protocol_opcode == SecureProtocolOpcode.CASE_SIGMA2_RESUME:
-                print("Received CASE Sigma2 Resume")
+                logger.debug("Received CASE Sigma2 Resume")
             elif protocol_opcode == SecureProtocolOpcode.STATUS_REPORT:
-                print("Received Status Report")
+                logger.debug("Received Status Report")
                 report = session.StatusReport()
                 report.decode(message.application_payload)
-                print(report)
+                logger.debug("Status report: %r", report)
 
                 # Acknowledge the message because we have no further reply.
                 if message.exchange_flags & session.ExchangeFlags.R:
                     exchange.send_standalone()
             elif protocol_opcode == SecureProtocolOpcode.ICD_CHECK_IN:
-                print("Received ICD Check-in")
+                logger.debug("Received ICD Check-in")
             elif protocol_opcode == SecureProtocolOpcode.MRP_STANDALONE_ACK:
-                print("Received MRP Standalone Ack")
-                print(message)
+                logger.debug("Received MRP Standalone Ack")
+                logger.debug("Message: %r", message)
             else:
-                print("Unhandled secure channel opcode", protocol_opcode)
+                logger.warning("Unhandled secure channel opcode: %s", protocol_opcode)
         elif message.protocol_id == ProtocolId.INTERACTION_MODEL:
             secure_session_context = self.manager.secure_session_contexts[message.session_id]
             if protocol_opcode == InteractionModelOpcode.READ_REQUEST:
@@ -420,7 +427,7 @@ class CircuitMatter:
                 )
                 attribute_reports = []
                 for path in read_request.AttributeRequests:
-                    print("read", path)
+                    logger.debug("Reading attribute path: %s", path)
                     attribute_reports.extend(self.read_attribute_path(secure_session_context, path))
                 response = interaction_model.ReportDataMessage()
                 response.SuppressResponse = True
@@ -428,7 +435,7 @@ class CircuitMatter:
                 exchange.send(response)
                 exchange.close()
             elif protocol_opcode == InteractionModelOpcode.WRITE_REQUEST:
-                print("Received Write Request")
+                logger.debug("Received Write Request")
                 write_request = interaction_model.WriteRequestMessage.decode(
                     message.application_payload
                 )
@@ -446,7 +453,7 @@ class CircuitMatter:
                 exchange.close()
 
             elif protocol_opcode == InteractionModelOpcode.INVOKE_REQUEST:
-                print("Received Invoke Request")
+                logger.debug("Received Invoke Request")
                 invoke_request = interaction_model.InvokeRequestMessage.decode(
                     message.application_payload
                 )
@@ -468,7 +475,7 @@ class CircuitMatter:
                                     )
                                 )
                             else:
-                                print(f"Cluster 0x{path.Cluster:02x} not found")
+                                logger.debug("Cluster 0x%02x not found on endpoint", path.Cluster)
                     elif path.Cluster in self._endpoints[path.Endpoint]:
                         cluster = self._endpoints[path.Endpoint][path.Cluster]
                         invoke_responses.append(
@@ -481,16 +488,16 @@ class CircuitMatter:
                             )
                         )
                     else:
-                        print(f"Cluster 0x{path.Cluster:02x} not found")
+                        logger.debug("Cluster 0x%02x not found on endpoint %d", path.Cluster, path.Endpoint)
                 response = interaction_model.InvokeResponseMessage()
                 response.SuppressResponse = False
                 response.InvokeResponses = invoke_responses
                 exchange.send(response)
                 exchange.close()
             elif protocol_opcode == InteractionModelOpcode.INVOKE_RESPONSE:
-                print("Received Invoke Response")
+                logger.debug("Received Invoke Response")
             elif protocol_opcode == InteractionModelOpcode.SUBSCRIBE_REQUEST:
-                print("Received Subscribe Request")
+                logger.debug("Received Subscribe Request")
                 subscribe_request = interaction_model.SubscribeRequestMessage.decode(
                     message.application_payload
                 )
@@ -519,9 +526,10 @@ class CircuitMatter:
                 status_response = interaction_model.StatusResponseMessage.decode(
                     message.application_payload
                 )
-                print(
-                    f"Received Status Response on {message.session_id}/{message.exchange_id}",
-                    f"ack {message.acknowledged_message_counter}: {status_response.Status!r}",
+                logger.debug(
+                    "Received Status Response on %d/%d ack %d: %r",
+                    message.session_id, message.exchange_id,
+                    message.acknowledged_message_counter, status_response.Status
                 )
 
                 # Acknowledge the message because we have no further reply.
@@ -540,11 +548,10 @@ class CircuitMatter:
                     exchange.close()
 
             else:
-                print(message)
-                print("application payload", message.application_payload.hex(" "))
+                logger.debug("Unhandled interaction model opcode - message: %r", message)
+                logger.debug("Application payload: %s", message.application_payload.hex(" "))
         else:
-            print("Unknown protocol", message.protocol_id, message.protocol_opcode)
-        print()
+            logger.warning("Unknown protocol %s with opcode %s", message.protocol_id, message.protocol_opcode)
 
         self.nonvolatile.commit()
         # TODO: Rollback on error?
