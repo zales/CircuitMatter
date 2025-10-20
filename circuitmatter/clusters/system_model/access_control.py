@@ -52,8 +52,8 @@ class AccessControlCluster(Cluster):
     class AccessControlEntryStruct(tlv.Structure):
         Privilege = tlv.EnumMember(1, AccessControlEntryPrivilegeEnum)
         AuthMode = tlv.EnumMember(2, AccessControlEntryAuthModeEnum)
-        Subjects = List(3, Uint64())
-        Targets = List(4, AccessControlTargetStruct, nullable=True)
+        Subjects = tlv.ArrayMember(3, Uint64())
+        Targets = tlv.ArrayMember(4, AccessControlTargetStruct, nullable=True)
 
     class AccessControlExtensionStruct(tlv.Structure):
         Data = tlv.OctetStringMember(1, max_length=128)
