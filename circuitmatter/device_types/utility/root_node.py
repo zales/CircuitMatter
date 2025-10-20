@@ -124,6 +124,9 @@ class _NodeOperationalCredentialsCluster(NodeOperationalCredentialsCluster):
 
     def restore(self, nonvolatile):
         super().restore(nonvolatile)
+        
+        # Store reference to nonvolatile data for use in certificate methods
+        self._nonvolatile = nonvolatile
 
         self.dac_key = ecdsa.keys.SigningKey.from_der(
             binascii.a2b_base64(nonvolatile["dac_key"]), hashfunc=hashlib.sha256
