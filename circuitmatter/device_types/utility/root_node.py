@@ -375,7 +375,8 @@ class _NodeOperationalCredentialsCluster(NodeOperationalCredentialsCluster):
         session,
         args: NodeOperationalCredentialsCluster.RemoveFabric,
     ) -> NodeOperationalCredentialsCluster.NOCResponse:
-        index = args.FabricIndex
+        # FabricIndex is 1-based, convert to 0-based for Python lists
+        index = args.FabricIndex - 1
         self.commissioned_fabrics -= 1
 
         self.noc_keys[index] = None
