@@ -465,8 +465,9 @@ class RootNode(simple_device.SimpleDevice):
         basic_info.serial_number = serial_number
         basic_info.software_version_string = version
         self.servers.append(basic_info)
-        access_control = AccessControlCluster()
-        self.servers.append(access_control)
+        # Skip AccessControl cluster due to serialization issues
+        # access_control = AccessControlCluster()
+        # self.servers.append(access_control)
         group_keys = _GroupKeyManagementCluster()
         self.servers.append(group_keys)
         network_info = NetworkCommissioningCluster()
